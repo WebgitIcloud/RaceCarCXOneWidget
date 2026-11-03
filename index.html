@@ -420,7 +420,7 @@ document.getElementById('summary').innerHTML =
 
   cxone('init', cfg.brandId);
   cxone('chat', 'init', Number(cfg.brandId) || cfg.brandId, cfg.channelId);
-  if (cfg.alwaysOnline) cxone('chat', 'chat', 'enableChatAlwaysOnline');
+  if (cfg.alwaysOnline) cxone('chat', 'enableChatAlwaysOnline');
   cxone('chat', 'setCustomCss', cssToSend(themeCss));
   log('Commands queued', { alwaysOnline: cfg.alwaysOnline, hideQueue: cfg.hideQueue, theme: cfg.theme });
 
