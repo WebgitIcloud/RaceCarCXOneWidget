@@ -25,7 +25,7 @@ On load, the page makes the same calls as the standard embed snippet:
 ```js
 cxone('init', '<brandId>');
 cxone('chat', 'init', <brandId>, '<channelId>');
-cxone('chat', 'chat', 'enableChatAlwaysOnline');   // optional
+cxone('chat', 'enableChatAlwaysOnline');           // optional
 cxone('chat', 'setCustomCss', '<GOV.UK theme CSS>');
 ```
 
@@ -49,19 +49,46 @@ URL, which takes priority over saved settings:
 | `brandId` | `?brandId=3756` | CXone brand (tenant) ID |
 | `channelId` | `?channelId=chat_xxx` | Chat channel ID |
 | `env` | `?env=UK1` | Cluster: UK1, UK2, EU1, EU2, NA1, NA2, AU1, AU2, CA1, JP1, AE1, JO1, KR1, ZA1 |
-| `host` | `?host=web-modules-de-uk1.niceincontact.com` | Custom loader host, which overrides `env` |
+| `host` | `?host=uk3.nicecxone-sov2.uk` | Custom cluster host, which overrides `env`. The `web-modules-de-` prefix is added if missing, so the SDK harness value works here too |
 | `theme` | `?theme=0` | Turn off the GOV.UK theme to see the widget's default look |
+| `display` | `?display=floating` | `embedded` (default) puts the chat in the page; `floating` shows the standard corner icon |
 
 The loader URL is built as `https://web-modules-de-<env>.niceincontact.com/loader/1/loader.js`.
+For a custom host such as `uk3.nicecxone-sov2.uk` it becomes
+`https://web-modules-de-uk3.nicecxone-sov2.uk/loader/1/loader.js`.
 
 Options in Connection settings:
 
-- **Always show chat as online** – sends `enableChatAlwaysOnline`.
+- **How the chat is shown** – embedded in the page (default) or the standard
+  floating chat icon. See [Embedded mode](#embedded-mode).
+- **Always show chat as online** – sends `cxone('chat', 'enableChatAlwaysOnline')`.
+  Without it, a live chat channel that routes to a bot (such as Cognigy) shows
+  "We're offline", because CXone reports the channel as offline when no agents
+  are available. Use exactly this form: `cxone('chat', 'chat', 'enableChatAlwaysOnline')`
+  is silently ignored.
 - **Hide the waiting queue pop-up** – adds
   `[class*="WaitingQueueModal_WaitingQueueModal"] { display: none !important; }`.
 - **Apply the GOV.UK theme to the widget** – sends the theme CSS.
 
 The defaults are built in at the top of the main script (`DEFAULTS`).
+
+## Embedded mode
+
+The CXone loader has no option to place the chat inside a page element – it always
+draws a floating window. In embedded mode the page does three things:
+
+1. Sends `cxone('chat', 'setFullDisplay')` and `cxone('chat', 'openChatWindow')`,
+   so the window opens straight away and fills its frame.
+2. Hides the window's minimise button with `setCustomCss`, so it stays open.
+3. Pins the widget's container (`#be-chat-container`) over the `#chat-slot` panel
+   with page CSS and keeps it aligned as the page scrolls or its layout changes.
+
+To change the chat's size, change the height of `.chat-slot` in the page styles
+(600px by default, limited to 80% of the screen height).
+
+Because this repositions the widget's own elements, a future CXone release could
+change how it behaves. If the chat stops lining up with the panel, switch to the
+floating icon with `?display=floating`.
 
 ## How the styling works
 
