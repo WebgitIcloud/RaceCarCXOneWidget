@@ -466,8 +466,11 @@ document.getElementById('summary').innerHTML =
   // Documented form is cxone('chat', 'enableChatAlwaysOnline') – an extra 'chat' argument is silently ignored
   if (cfg.alwaysOnline) cxone('chat', 'enableChatAlwaysOnline');
   if (EMBEDDED) {
-    // Fill the frame and keep the window open; the page then pins the frame over #chat-slot
-    cxone('chat', 'setFullDisplay');
+    // Fill the frame and keep the window open; the page then pins the frame over #chat-slot.
+    // Not setFullDisplay: that makes the widget a full-screen dialog, which marks the rest
+    // of the page inert (no links, hidden from screen readers) and locks scrolling.
+    cxone('chat', 'setWindowWidth', '100%');
+    cxone('chat', 'setWindowHeight', '100%');
     cxone('chat', 'openChatWindow');
   }
   cxone('chat', 'setCustomCss', cssToSend(themeCss));
@@ -497,6 +500,19 @@ function startEmbedding() {
   document.getElementById('floating-body').hidden = true;
   window.addEventListener('resize', placeEmbed);
   document.addEventListener('toggle', placeEmbed, true);
+  // Safeguard: if the widget still switches to full-screen (e.g. on small screens), it marks the
+  // rest of the page inert and aria-hidden and locks scrolling. The chat is part of the page here, so undo that.
+  function undoModal() {
+    [].forEach.call(document.body.children, function (el) {
+      if (el.id === 'be-chat-container' || el.tagName === 'SCRIPT' || el.tagName === 'IFRAME') return;
+      if (el.hasAttribute('inert')) el.removeAttribute('inert');
+      if (el.getAttribute('aria-hidden') === 'true') el.removeAttribute('aria-hidden');
+    });
+    if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+  }
+  new MutationObserver(function (records) {
+    if (records.some(function (r) { return r.target === document.body || r.target.parentNode === document.body; })) undoModal();
+  }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['inert', 'aria-hidden', 'style'] });
   // Anything above the slot can change height (banners, expanded settings), so re-check its position regularly
   var last = '';
   setInterval(function () {
