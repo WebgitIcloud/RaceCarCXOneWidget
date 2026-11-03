@@ -75,6 +75,9 @@ Options in Connection settings:
   first message to start the session; agents can see it, the customer can't. If your Cognigy
   Flow reacts to the first input it receives, make sure that message doesn't send it down
   the wrong path. If a session is already running, the existing chat is reopened instead.
+  After a chat ends, the widget shows the name form again for the next conversation;
+  the page fills in the same name and starts it automatically. If the form ever asks for
+  more than a name, it's left for you to fill in.
 - **Hide the waiting queue pop-up** – adds
   `[class*="WaitingQueueModal_WaitingQueueModal"] { display: none !important; }`.
 - **Apply the GOV.UK theme to the widget** – sends the theme CSS.
@@ -182,4 +185,4 @@ To style them more closely:
 ## Links
 
 - [Custom SDK harness](https://webgiticloud.github.io/RaceCarFrontEndHarness/)
-- [CXone chat customisation documentation](https://help.nicecxone.com/content/acd/digital/digitalchat/chatcustomizecss.htm)
+- [Customize Chat Channels Using JavaScript](https://help.nicecxone.com/content/acd/digital/chat/customizechatchannelsusingjs.htm)
