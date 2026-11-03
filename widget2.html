@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en" class="govuk-template">
+<head>
+  <meta charset="utf-8">
+  <title>Native chat widget – CXone test harness</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0c0c">
+  <meta name="robots" content="noindex, nofollow">
+
+  <!-- GOV.UK Design System styles (look and feel only) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/govuk-frontend@5/dist/govuk/govuk-frontend.min.css">
+
+  <style>
+    /* GDS Transport is licensed for service.gov.uk domains only, so the harness stays on Arial. */
+    .govuk-template, .govuk-template body, .govuk-template body * { font-family: arial, sans-serif !important; }
+
+    .th-header { background: #0b0c0c; border-bottom: 10px solid #1d70b8; color: #fff; }
+    .th-header__inner { display: flex; align-items: center; gap: 15px; padding: 12px 0 8px; }
+    .th-header__name { color: #fff; font-weight: 700; font-size: 1.5rem; text-decoration: none; }
+    .th-header__name:hover { text-decoration: underline; text-decoration-thickness: 3px; }
+    .th-header__name:focus { color: #0b0c0c; }
+
+    .panel { border: 1px solid #b1b4b6; background: #fff; margin-bottom: 30px; }
+    .panel__status { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+                     padding: 10px 15px; border-bottom: 1px solid #b1b4b6; background: #f3f2f1; }
+    .panel__status p { margin: 0; }
+    .panel__body { padding: 20px 15px 5px; }
+    .panel__body .govuk-button-group { margin-bottom: 15px; }
+
+    .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 30px; }
+    .code-area { font-family: monospace !important; font-size: .85rem; min-height: 320px; }
+    .log pre { font-family: monospace !important; font-size: .8rem; max-height: 400px; overflow: auto; background: #f3f2f1; padding: 10px; white-space: pre-wrap; }
+    .inspector-table { font-size: 1rem; }
+    .inspector-table code, .govuk-body code, .govuk-hint code { font-family: monospace !important; }
+    .inspector-wrap { max-height: 420px; overflow: auto; margin-bottom: 20px; }
+    .swatch { display: inline-block; width: 14px; height: 14px; border: 1px solid #0b0c0c; vertical-align: middle; margin-right: 6px; }
+    /* Keep page content clear of the floating widget on small screens */
+    .mode-floating main { padding-bottom: 120px; }
+
+    /* ---------- Embedded mode: pin the widget over the chat slot ---------- */
+    .chat-slot { height: 600px; max-height: 80vh; min-height: 420px; background: #fff; }
+    .chat-slot[hidden] { display: none; }
+    .mode-embedded #be-chat-container { position: absolute !important; z-index: 1 !important; }
+    .mode-embedded #be-chat-container #be-frame {
+      position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important;
+      max-width: none !important; max-height: none !important; margin: 0 !important;
+      transform: none !important; box-shadow: none !important; z-index: auto !important;
+    }
+    .mode-embedded #be-chat-container #be-frame iframe {
+      width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important;
+    }
+  </style>
+</head>
+<body class="govuk-template__body">
+<script>document.body.className += ' js-enabled' + ('noModule' in HTMLScriptElement.prototype ? ' govuk-frontend-supported' : '');</script>
+
+<a href="#main-content" class="govuk-skip-link" data-module="govuk-skip-link">Skip to main content</a>
+
+<header class="th-header" role="banner">
+  <div class="govuk-width-container th-header__inner">
+    <a href="#" class="th-header__name">Chat test harness</a>
+  </div>
+</header>
+
+<div class="govuk-width-container">
+  <div class="govuk-phase-banner">
+    <p class="govuk-phase-banner__content">
+      <strong class="govuk-tag govuk-phase-banner__content__tag">Test</strong>
+      <span class="govuk-phase-banner__text">Native CXone chat widget with GOV.UK styling. Not a live service.</span>
+    </p>
+  </div>
+
+  <a href="./" class="govuk-back-link">Back to the custom SDK harness</a>
+
+  <main class="govuk-main-wrapper" id="main-content" role="main">
+    <div class="govuk-grid-row">
+      <div class="govuk-grid-column-full">
+
+        <h1 class="govuk-heading-xl" id="page-title">Ask us online</h1>
+
+        <div class="govuk-notification-banner" role="alert" aria-labelledby="banner-title" id="banner" hidden>
+          <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title" id="banner-title">Important</h2>
+          </div>
+          <div class="govuk-notification-banner__content">
+            <p class="govuk-notification-banner__heading" id="banner-text"></p>
+          </div>
+        </div>
+
+        <p class="govuk-body-l">This page loads the standard CXone chat widget and restyles it to match the custom harness.</p>
+
+        <!-- ================= Widget status ================= -->
+        <div class="panel">
+          <div class="panel__status">
+            <p class="govuk-body" id="status-text" aria-live="polite">Loading the chat widget…</p>
+            <p class="govuk-body"><strong class="govuk-tag govuk-tag--grey" id="status-tag">Loading</strong></p>
+          </div>
+          <div class="chat-slot" id="chat-slot" hidden aria-label="Chat"></div>
+          <div class="panel__body" id="floating-body">
+            <p class="govuk-body">The widget appears in the bottom-right corner of the page. You can also open it from here.</p>
+            <div class="govuk-button-group">
+              <button type="button" class="govuk-button govuk-button--start" id="btn-open" data-module="govuk-button" disabled>
+                Start chat
+                <svg class="govuk-button__start-icon" xmlns="http://www.w3.org/2000/svg" width="17.5" height="19" viewBox="0 0 33 40" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 0h13l20 20-20 20H0l20-20z"/></svg>
+              </button>
+            </div>
+            <dl class="govuk-summary-list govuk-summary-list--no-border" id="summary"></dl>
+          </div>
+        </div>
+
+        <!-- ================= Settings ================= -->
+        <details class="govuk-details" id="settings">
+          <summary class="govuk-details__summary">
+            <span class="govuk-details__summary-text">Connection settings</span>
+          </summary>
+          <div class="govuk-details__text">
+            <form id="settings-form" novalidate>
+              <div class="settings-grid">
+                <div class="govuk-form-group">
+                  <label class="govuk-label" for="cfg-brandId">Brand ID</label>
+                  <input class="govuk-input govuk-input--width-10" id="cfg-brandId" name="brandId" inputmode="numeric" autocomplete="off">
+                </div>
+                <div class="govuk-form-group">
+                  <label class="govuk-label" for="cfg-channelId">Channel ID</label>
+                  <div class="govuk-hint">For example, chat_1234abcd-…</div>
+                  <input class="govuk-input" id="cfg-channelId" name="channelId" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="govuk-form-group">
+                  <label class="govuk-label" for="cfg-environment">Environment</label>
+                  <select class="govuk-select" id="cfg-environment" name="environment">
+                    <option>UK1</option><option>UK2</option><option>EU1</option><option>EU2</option>
+                    <option>NA1</option><option>NA2</option><option>AU1</option><option>AU2</option>
+                    <option>CA1</option><option>JP1</option><option>AE1</option><option>JO1</option>
+                    <option>KR1</option><option>ZA1</option>
+                    <option value="custom">Custom (enter loader host below)</option>
+                  </select>
+                </div>
+                <div class="govuk-form-group">
+                  <label class="govuk-label" for="cfg-customHost">Custom loader host</label>
+                  <div class="govuk-hint">Only used when Environment is Custom. Enter the cluster host, for example <code>uk3.nicecxone-sov2.uk</code> (the same value as the SDK harness), or the full loader host <code>web-modules-de-uk3.nicecxone-sov2.uk</code></div>
+                  <input class="govuk-input" id="cfg-customHost" name="customHost" spellcheck="false" autocomplete="off">
+                </div>
+                <div class="govuk-form-group">
+                  <label class="govuk-label" for="cfg-title">Page heading</label>
+                  <input class="govuk-input" id="cfg-title" name="title">
+                </div>
+              </div>
+
+              <div class="govuk-form-group">
+                <fieldset class="govuk-fieldset">
+                  <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">How the chat is shown</legend>
+                  <div class="govuk-radios govuk-radios--small" data-module="govuk-radios">
+                    <div class="govuk-radios__item">
+                      <input class="govuk-radios__input" id="cfg-display-embedded" name="display" type="radio" value="embedded">
+                      <label class="govuk-label govuk-radios__label" for="cfg-display-embedded">Embedded in the page, always open</label>
+                    </div>
+                    <div class="govuk-radios__item">
+                      <input class="govuk-radios__input" id="cfg-display-floating" name="display" type="radio" value="floating">
+                      <label class="govuk-label govuk-radios__label" for="cfg-display-floating">Floating chat icon in the corner (standard widget)</label>
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+
+              <div class="govuk-form-group">
+                <div class="govuk-checkboxes govuk-checkboxes--small" data-module="govuk-checkboxes">
+                  <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" id="cfg-alwaysOnline" name="alwaysOnline" type="checkbox">
+                    <label class="govuk-label govuk-checkboxes__label" for="cfg-alwaysOnline">Always show chat as online (<code>enableChatAlwaysOnline</code>)</label>
+                  </div>
+                  <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" id="cfg-hideQueue" name="hideQueue" type="checkbox">
+                    <label class="govuk-label govuk-checkboxes__label" for="cfg-hideQueue">Hide the waiting queue pop-up</label>
+                  </div>
+                  <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" id="cfg-theme" name="theme" type="checkbox">
+                    <label class="govuk-label govuk-checkboxes__label" for="cfg-theme">Apply the GOV.UK theme to the widget</label>
+                  </div>
+                  <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" id="cfg-autoStart" name="autoStart" type="checkbox">
+                    <label class="govuk-label govuk-checkboxes__label" for="cfg-autoStart">Skip the name form and start the chat when the page loads (<code>autoStartSession</code>)</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="govuk-form-group">
+                <label class="govuk-label" for="cfg-customerName">Name sent to CXone when the form is skipped</label>
+                <div class="govuk-hint">CXone needs a customer name, so this one is used instead of asking</div>
+                <input class="govuk-input govuk-!-width-one-half" id="cfg-customerName" name="customerName" autocomplete="off">
+              </div>
+
+              <div class="govuk-button-group">
+                <button type="submit" class="govuk-button" data-module="govuk-button">Save and reload</button>
+                <button type="button" class="govuk-button govuk-button--secondary" id="btn-defaults">Restore defaults</button>
+              </div>
+              <p class="govuk-body-s">The widget can only start once per page, so saving reloads the page. Settings are saved in this browser.
+                You can also pass them in the URL, for example <code>?brandId=1234&amp;channelId=chat_xxx&amp;env=UK1</code>.</p>
+            </form>
+          </div>
+        </details>
+
+        <!-- ================= Theme editor ================= -->
+        <details class="govuk-details" id="theme-details">
+          <summary class="govuk-details__summary">
+            <span class="govuk-details__summary-text">Widget styles (CSS)</span>
+          </summary>
+          <div class="govuk-details__text">
+            <p class="govuk-body">This CSS is sent to the widget with <code>cxone('chat', 'setCustomCss', …)</code> when the page loads.
+              Applying changes here updates the open widget straight away, so you can try things before saving.</p>
+            <div class="govuk-form-group">
+              <label class="govuk-label" for="css">Custom CSS</label>
+              <div class="govuk-hint">Target elements with <code>[data-selector="…"]</code> or <code>[class*="Name_Name"]</code>. The hashed part of class names changes between widget releases, so do not use it.</div>
+              <textarea class="govuk-textarea code-area" id="css" spellcheck="false" rows="18"></textarea>
+            </div>
+            <div class="govuk-button-group">
+              <button type="button" class="govuk-button" id="css-apply">Apply to widget</button>
+              <button type="button" class="govuk-button govuk-button--secondary" id="css-save">Save</button>
+              <button type="button" class="govuk-button govuk-button--secondary" id="css-copy">Copy setCustomCss snippet</button>
+              <button type="button" class="govuk-button govuk-button--warning" id="css-reset">Reset to GOV.UK theme</button>
+            </div>
+          </div>
+        </details>
+
+        <!-- ================= Inspector ================= -->
+        <details class="govuk-details" id="inspector">
+          <summary class="govuk-details__summary">
+            <span class="govuk-details__summary-text">Widget inspector (developer)</span>
+          </summary>
+          <div class="govuk-details__text">
+            <p class="govuk-body">Lists the selectors in the widget as it is right now. Start a conversation first to see message and composer elements.</p>
+            <div class="govuk-button-group">
+              <button type="button" class="govuk-button govuk-button--secondary" id="btn-scan">Scan widget</button>
+            </div>
+            <div id="scan-out"></div>
+          </div>
+        </details>
+
+        <!-- ================= Event log ================= -->
+        <details class="govuk-details log">
+          <summary class="govuk-details__summary"><span class="govuk-details__summary-text">Event log (developer)</span></summary>
+          <div class="govuk-details__text">
+            <div class="govuk-button-group">
+              <button type="button" class="govuk-button govuk-button--secondary" id="log-copy">Copy log</button>
+              <button type="button" class="govuk-button govuk-button--secondary" id="log-clear">Clear log</button>
+            </div>
+            <pre id="log"></pre>
+          </div>
+        </details>
+
+        <p class="govuk-body"><a class="govuk-link" href="./">Open the custom SDK front end</a></p>
+        <p class="govuk-body"><a class="govuk-link" href="https://help.nicecxone.com/content/acd/digital/digitalchat/chatcustomizecss.htm" target="_blank" rel="noopener">CXone chat customisation documentation (opens in new tab)</a></p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<footer class="govuk-footer" role="contentinfo">
+  <div class="govuk-width-container">
+    <div class="govuk-footer__meta">
+      <div class="govuk-footer__meta-item govuk-footer__meta-item--grow">
+        <h2 class="govuk-visually-hidden">Support links</h2>
+        <p class="govuk-body-s govuk-!-margin-bottom-0">Test harness for the native NiCE CXone chat widget. Version <span id="version"></span></p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Default GOV.UK theme for the widget. Edit it from "Widget styles (CSS)" on the page. -->
+<script type="text/plain" id="default-css">
+/* GOV.UK look for the native CXone chat widget */
+:root:root {
+  --chat-shape-borderRadius: 0px !important;
+  --chat-chatCustomization-colors-buttonColor: #00703c !important;
+  --chat-chatCustomization-colors-headerBgColor: #0b0c0c !important;
+  --chat-chatCustomization-colors-headerFontColor: #ffffff !important;
+  --chat-chatCustomization-colors-secondaryMessageBgColor: #f3f2f1 !important;
+  --chat-chatCustomization-colors-secondaryMessageFontColor: #0b0c0c !important;
+  --chat-chatCustomization-colors-themeColor: #1d70b8 !important;
+  --chat-chatCustomization-colors-widgetBgColor: #1d70b8 !important;
+  --chat-chatCustomization-colors-widgetFontColor: #ffffff !important;
+  --chat-chatCustomization-colors-textColor: #0b0c0c !important;
+}
+#be-app, #be-app * { font-family: arial, sans-serif !important; }
+#be-app *:not(svg):not(path) { border-radius: 0 !important; }
+
+/* Launcher */
+[data-selector="WIDGET"] {
+  background: #1d70b8 !important; color: #fff !important; border: 0 !important;
+  box-shadow: 0 2px 0 #003078 !important; font-weight: 700 !important; font-size: 19px !important;
+}
+[data-selector="WIDGET"]:hover { background: #003078 !important; }
+[data-selector="WIDGET"]:focus-visible { outline: 3px solid transparent !important; background: #ffdd00 !important; color: #0b0c0c !important; box-shadow: 0 4px 0 #0b0c0c !important; }
+
+/* Window */
+[data-selector="WINDOW"] { border: 1px solid #b1b4b6 !important; box-shadow: none !important; background: #fff !important; }
+[data-selector="HEADER"] { background: #0b0c0c !important; color: #fff !important; border-bottom: 5px solid #1d70b8 !important; }
+[data-selector="HEADER"] button { color: #fff !important; }
+[data-selector="HEADER"] button:focus-visible { outline: 3px solid #ffdd00 !important; outline-offset: 0 !important; }
+[data-selector="CONTENT"] { background: #fff !important; color: #0b0c0c !important; font-size: 16px !important; line-height: 1.25 !important; }
+
+/* Pre-chat form */
+[data-selector="PRECONTACT_SURVEY_DESCRIPTION"] { color: #0b0c0c !important; font-size: 16px !important; text-align: left !important; }
+[data-selector="FORM_FIELD_LABEL"] { color: #0b0c0c !important; font-size: 16px !important; font-weight: 700 !important; }
+[data-selector="PRECONTACT_SURVEY_FOOTER"] { border-top: 1px solid #b1b4b6 !important; background: #f3f2f1 !important; }
+
+/* Inputs, including the message composer */
+#be-app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+#be-app textarea, #be-app select {
+  border: 2px solid #0b0c0c !important; background: #fff !important; color: #0b0c0c !important;
+  font-size: 16px !important; box-shadow: none !important;
+}
+#be-app input:focus, #be-app textarea:focus, #be-app select:focus {
+  outline: 3px solid #ffdd00 !important; outline-offset: 0 !important; box-shadow: inset 0 0 0 2px #0b0c0c !important;
+}
+[class*="Input_Field"] { border: 0 !important; box-shadow: none !important; background: transparent !important; }
+
+/* Buttons */
+[class^="Button_Btn"], [data-selector="PRIMARY_BUTTON"] {
+  background: #00703c !important; color: #fff !important; border: 2px solid transparent !important;
+  box-shadow: 0 2px 0 #002d18 !important; font-size: 16px !important; font-weight: 400 !important;
+}
+[class^="Button_Btn"]:hover, [data-selector="PRIMARY_BUTTON"]:hover { background: #005a30 !important; }
+[class^="Button_Btn"]:focus-visible, [data-selector="PRIMARY_BUTTON"]:focus-visible {
+  outline: 3px solid transparent !important; background: #ffdd00 !important; color: #0b0c0c !important; box-shadow: 0 2px 0 #0b0c0c !important;
+}
+[class^="Button_Btn"] [class^="Button_Button"], [data-selector="PRIMARY_BUTTON"] > div {
+  background: transparent !important; color: inherit !important; box-shadow: none !important; border: 0 !important;
+}
+[data-selector="HEADER"] button, [data-selector="HEADER"] [class*="Button"] { background: transparent !important; box-shadow: none !important; }
+
+/* Links */
+#be-app a { color: #1d70b8 !important; text-decoration: underline !important; }
+#be-app a:hover { color: #003078 !important; }
+#be-app a:focus-visible { outline: 3px solid transparent !important; background: #ffdd00 !important; color: #0b0c0c !important; box-shadow: 0 -2px #ffdd00, 0 4px #0b0c0c !important; text-decoration: none !important; }
+</script>
+
+<script>
+/* =====================================================================
+   Config
+   ===================================================================== */
+var HARNESS_VERSION = '2026-11-03.1';
+var STORE_KEY = 'cxoneWidgetHarness';
+var CSS_MARKER = '/* harness-theme */';
+var DEFAULTS = {
+  brandId: '3756',
+  channelId: 'chat_ba8be2e1-2600-45df-8574-01ec95486cd3',
+  environment: 'NA1',
+  customHost: '',
+  title: 'Ask us online',
+  alwaysOnline: true,
+  hideQueue: true,
+  theme: true,
+  display: 'embedded',
+  autoStart: true,
+  customerName: 'Web visitor'
+};
+var QUEUE_CSS = '[class*="WaitingQueueModal_WaitingQueueModal"] { display: none !important; }';
+var DEFAULT_CSS = document.getElementById('default-css').textContent.trim();
+
+/* ---------- Logging ---------- */
+var logEl = document.getElementById('log');
+function log(msg, data) {
+  var t = new Date().toISOString().slice(11, 23);
+  var line = '[' + t + '] ' + msg;
+  if (data !== undefined) { try { line += ' ' + (typeof data === 'string' ? data : JSON.stringify(data)); } catch (e) {} }
+  logEl.textContent += line + '\n';
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ---------- Settings: URL > saved > defaults ---------- */
+function readStore() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; } }
+function writeStore(obj) { try { localStorage.setItem(STORE_KEY, JSON.stringify(obj)); } catch (e) { log('Could not save settings', String(e)); } }
+
+var stored = readStore();
+var cfg = Object.assign({}, DEFAULTS, stored.settings || {});
+var qs = new URLSearchParams(location.search);
+if (qs.get('brandId')) cfg.brandId = qs.get('brandId');
+if (qs.get('channelId')) cfg.channelId = qs.get('channelId');
+if (qs.get('env')) cfg.environment = qs.get('env').toUpperCase() === 'CUSTOM' ? 'custom' : qs.get('env').toUpperCase();
+if (qs.get('host')) { cfg.environment = 'custom'; cfg.customHost = qs.get('host'); }
+if (qs.get('theme') !== null) cfg.theme = qs.get('theme') !== '0';
+if (qs.get('autostart') !== null) cfg.autoStart = qs.get('autostart') !== '0';
+if (qs.get('name')) cfg.customerName = qs.get('name');
+if (qs.get('display')) cfg.display = qs.get('display') === 'floating' ? 'floating' : 'embedded';
+var EMBEDDED = cfg.display !== 'floating';
+document.documentElement.classList.add(EMBEDDED ? 'mode-embedded' : 'mode-floating');
+var EMBED_CSS = '[data-selector="HEADER_MINIMIZE_WINDOW"] { display: none !important; }';
+var themeCss = typeof stored.css === 'string' && stored.css.trim() ? stored.css : DEFAULT_CSS;
+
+function loaderHost() {
+  if (cfg.environment === 'custom') {
+    var h = (cfg.customHost || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    // Accept the SDK-harness form (uk3.nicecxone-sov2.uk) as well as the full loader host
+    if (h && !/^web-modules-/.test(h)) h = 'web-modules-de-' + h.replace(/^channels-de-/, '');
+    return h;
+  }
+  return 'web-modules-de-' + String(cfg.environment).toLowerCase() + '.niceincontact.com';
+}
+function cssToSend(css) {
+  var parts = [CSS_MARKER];
+  if (cfg.hideQueue) parts.push(QUEUE_CSS);
+  if (EMBEDDED) parts.push(EMBED_CSS);
+  if (cfg.theme) parts.push(css);
+  return parts.join('\n');
+}
+
+/* ---------- Populate the form ---------- */
+var form = document.getElementById('settings-form');
+function fillForm(c) {
+  ['brandId', 'channelId', 'environment', 'customHost', 'title', 'customerName'].forEach(function (k) { form.elements[k].value = c[k] || ''; });
+  ['alwaysOnline', 'hideQueue', 'theme', 'autoStart'].forEach(function (k) { form.elements[k].checked = !!c[k]; });
+  form.elements.display.value = c.display === 'floating' ? 'floating' : 'embedded';
+}
+fillForm(cfg);
+document.getElementById('page-title').textContent = cfg.title || DEFAULTS.title;
+document.getElementById('version').textContent = HARNESS_VERSION;
+var cssBox = document.getElementById('css');
+cssBox.value = themeCss;
+
+form.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var next = {};
+  ['brandId', 'channelId', 'environment', 'customHost', 'title', 'customerName'].forEach(function (k) { next[k] = form.elements[k].value.trim(); });
+  ['alwaysOnline', 'hideQueue', 'theme', 'autoStart'].forEach(function (k) { next[k] = form.elements[k].checked; });
+  next.display = form.elements.display.value || 'embedded';
+  var s = readStore(); s.settings = next; writeStore(s);
+  location.href = location.pathname; // drop URL overrides so saved settings take effect
+});
+document.getElementById('btn-defaults').addEventListener('click', function () { fillForm(DEFAULTS); });
+
+/* ---------- Status ---------- */
+var statusText = document.getElementById('status-text');
+var statusTag = document.getElementById('status-tag');
+function setStatus(text, tag, colour) {
+  statusText.textContent = text;
+  statusTag.textContent = tag;
+  statusTag.className = 'govuk-tag' + (colour ? ' govuk-tag--' + colour : '');
+}
+function showBanner(text) {
+  document.getElementById('banner-text').textContent = text;
+  document.getElementById('banner').hidden = false;
+}
+function summaryRow(k, v) {
+  return '<div class="govuk-summary-list__row"><dt class="govuk-summary-list__key">' + k +
+    '</dt><dd class="govuk-summary-list__value"><code>' + String(v).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</code></dd></div>';
+}
+document.getElementById('summary').innerHTML =
+  summaryRow('Brand ID', cfg.brandId || '–') + summaryRow('Channel ID', cfg.channelId || '–') + summaryRow('Loader', loaderHost() || '–');
+
+/* =====================================================================
+   Load the native widget (same calls as the standard embed snippet)
+   ===================================================================== */
+(function boot() {
+  var host = loaderHost();
+  if (!cfg.brandId || !cfg.channelId || !host) {
+    setStatus('Enter a brand ID, channel ID and environment in Connection settings.', 'Not set up', 'yellow');
+    document.getElementById('settings').open = true;
+    return;
+  }
+  var loaderUrl = 'https://' + host + '/loader/1/loader.js';
+  log('Loading widget', { loaderUrl: loaderUrl, brandId: cfg.brandId, channelId: cfg.channelId });
+
+  (function (n, u) {
+    window.CXoneDfo = n;
+    window[n] = window[n] || function () { (window[n].q = window[n].q || []).push(arguments); };
+    window[n].u = u;
+    var e = document.createElement('script');
+    e.type = 'module';
+    e.src = u + '?' + Math.round(Date.now() / 1e3 / 3600);
+    e.onerror = function () {
+      setStatus('The chat loader could not be downloaded from ' + host + '.', 'Error', 'red');
+      showBanner('The chat loader failed to load. Check the environment setting and your network.');
+      log('Loader script failed to load', u);
+    };
+    document.head.appendChild(e);
+  })('cxone', loaderUrl);
+
+  cxone('init', cfg.brandId);
+  cxone('chat', 'init', Number(cfg.brandId) || cfg.brandId, cfg.channelId);
+  // Documented form is cxone('chat', 'enableChatAlwaysOnline') – an extra 'chat' argument is silently ignored
+  if (cfg.alwaysOnline) cxone('chat', 'enableChatAlwaysOnline');
+  if (EMBEDDED) {
+    // Fill the frame and keep the window open; the page then pins the frame over #chat-slot.
+    // Not setFullDisplay: that makes the widget a full-screen dialog, which marks the rest
+    // of the page inert (no links, hidden from screen readers) and locks scrolling.
+    cxone('chat', 'setWindowWidth', '100%');
+    cxone('chat', 'setWindowHeight', '100%');
+  }
+  cxone('chat', 'setCustomCss', cssToSend(themeCss));
+  if (cfg.autoStart) {
+    // Documented order: name first (it's required), open the window, and autoStartSession must be the LAST call.
+    // This skips the pre-chat form and starts a session straight away (if one isn't already running).
+    cxone('chat', 'setCustomerName', cfg.customerName || DEFAULTS.customerName);
+    cxone('chat', 'openChatWindow');
+    cxone('chat', 'autoStartSession');
+  } else if (EMBEDDED) {
+    cxone('chat', 'openChatWindow');
+  }
+  log('Commands queued', { alwaysOnline: cfg.alwaysOnline, hideQueue: cfg.hideQueue, theme: cfg.theme, autoStart: cfg.autoStart, display: cfg.display });
+
+  waitForWidget();
+  if (EMBEDDED) startEmbedding();
+})();
+
+/* =====================================================================
+   Embedded mode: keep the widget's container lined up with #chat-slot.
+   The loader only offers a floating window, so the page positions it.
+   ===================================================================== */
+function placeEmbed() {
+  var c = document.getElementById('be-chat-container');
+  var slot = document.getElementById('chat-slot');
+  if (!c || slot.hidden) return;
+  var r = slot.getBoundingClientRect();
+  c.style.top = (r.top + window.scrollY) + 'px';
+  c.style.left = (r.left + window.scrollX) + 'px';
+  c.style.width = r.width + 'px';
+  c.style.height = r.height + 'px';
+}
+function startEmbedding() {
+  var slot = document.getElementById('chat-slot');
+  slot.hidden = false;
+  document.getElementById('floating-body').hidden = true;
+  window.addEventListener('resize', placeEmbed);
+  document.addEventListener('toggle', placeEmbed, true);
+  // Safeguard: if the widget still switches to full-screen (e.g. on small screens), it marks the
+  // rest of the page inert and aria-hidden and locks scrolling. The chat is part of the page here, so undo that.
+  function undoModal() {
+    [].forEach.call(document.body.children, function (el) {
+      if (el.id === 'be-chat-container' || el.tagName === 'SCRIPT' || el.tagName === 'IFRAME') return;
+      if (el.hasAttribute('inert')) el.removeAttribute('inert');
+      if (el.getAttribute('aria-hidden') === 'true') el.removeAttribute('aria-hidden');
+    });
+    if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+  }
+  new MutationObserver(function (records) {
+    if (records.some(function (r) { return r.target === document.body || r.target.parentNode === document.body; })) undoModal();
+  }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['inert', 'aria-hidden', 'style'] });
+  // Anything above the slot can change height (banners, expanded settings), so re-check its position regularly
+  var last = '';
+  setInterval(function () {
+    var r = slot.getBoundingClientRect();
+    var key = Math.round(r.top + window.scrollY) + ',' + Math.round(r.left + window.scrollX) + ',' + Math.round(r.width) + ',' + Math.round(r.height);
+    if (key !== last) { last = key; placeEmbed(); }
+  }, 150);
+  var tries = 0;
+  var t = setInterval(function () {
+    if (document.getElementById('be-chat-container')) { placeEmbed(); log('Widget embedded in the page'); clearInterval(t); }
+    else if (++tries > 100) clearInterval(t);
+  }, 250);
+}
+
+/* =====================================================================
+   Watch the widget
+   ===================================================================== */
+var widgetDoc = null;
+function widgetFrame() { return document.querySelector('#be-chat-container iframe'); }
+
+function waitForWidget() {
+  var started = Date.now();
+  var timer = setInterval(function () {
+    var f = widgetFrame();
+    var d = null;
+    try { d = f && f.contentDocument; } catch (e) {}
+    if (d && d.getElementById('be-app') && d.querySelector('[data-selector]')) {
+      clearInterval(timer);
+      widgetDoc = d;
+      onWidgetReady();
+    } else if (Date.now() - started > 25000) {
+      clearInterval(timer);
+      setStatus('The widget did not appear. Check the brand and channel IDs, and that this website is allowed for the channel.', 'Not loaded', 'red');
+      log('Widget not found after 25 seconds');
+    }
+  }, 300);
+}
+
+function onWidgetReady() {
+  var messenger = widgetDoc.querySelector('[data-selector="MESSENGER"]');
+  var state = messenger && messenger.getAttribute('data-cy');
+  setStatus('Chat widget loaded' + (state ? ' (' + state + ')' : '') + '.', 'Ready', 'green');
+  placeEmbed();
+  document.getElementById('btn-open').disabled = false;
+  log('Widget ready', { state: state || 'unknown' });
+
+  // Log open/close and new kinds of element (e.g. messages, composer) as they appear
+  var seen = {};
+  widgetDoc.querySelectorAll('[data-selector]').forEach(function (el) { seen[el.dataset.selector] = true; });
+  var lastExpanded = null;
+  new MutationObserver(function () {
+    var launcher = widgetDoc.querySelector('[data-selector="WIDGET"]');
+    var expanded = launcher ? launcher.getAttribute('aria-expanded') : (widgetDoc.querySelector('[data-selector="WINDOW"]') ? 'true' : null);
+    if (expanded !== lastExpanded) { if (lastExpanded !== null) log(expanded === 'true' ? 'Chat window opened' : 'Chat window closed'); lastExpanded = expanded; }
+    widgetDoc.querySelectorAll('[data-selector]').forEach(function (el) {
+      var s = el.dataset.selector;
+      if (!seen[s]) { seen[s] = true; log('New widget element', s); }
+    });
+  }).observe(widgetDoc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-expanded'] });
+}
+
+window.addEventListener('message', function (e) {
+  if (!/niceincontact|nicecxone|brandembassy/.test(e.origin)) return;
+  var d = e.data, summary;
+  if (d && typeof d === 'object' && 'sharedId' in d) return; // the widget's internal storage traffic
+  try { summary = typeof d === 'string' ? d.slice(0, 120) : (d && (d.type || d.event || d.name || d.action)) || Object.keys(d || {}).slice(0, 6).join(','); } catch (err) { summary = '…'; }
+  log('Message from ' + e.origin.replace('https://', ''), summary);
+});
+
+/* ---------- Open the chat from the page ---------- */
+document.getElementById('btn-open').addEventListener('click', function () {
+  if (!widgetDoc) return;
+  var launcher = widgetDoc.querySelector('[data-selector="WIDGET"]');
+  if (launcher && launcher.getAttribute('aria-expanded') !== 'true') launcher.click();
+  setTimeout(function () {
+    var target = widgetDoc.querySelector('[data-selector="WINDOW"] input, [data-selector="WINDOW"] textarea, [data-selector="WINDOW"] button');
+    if (target) { widgetFrame().focus(); target.focus(); }
+  }, 600);
+});
+
+/* =====================================================================
+   Live CSS editing
+   ===================================================================== */
+function applyCssLive(css) {
+  if (!widgetDoc) { log('Widget not ready yet – CSS will apply on next load'); return false; }
+  var full = cssToSend(css);
+  var nodes = [].filter.call(widgetDoc.querySelectorAll('style'), function (s) { return s.textContent.indexOf(CSS_MARKER) !== -1; });
+  if (!nodes.length) {
+    var s = widgetDoc.createElement('style');
+    s.setAttribute('data-harness', 'theme');
+    widgetDoc.head.appendChild(s);
+    nodes = [s];
+  }
+  nodes.forEach(function (n) { n.textContent = full; });
+  log('Applied CSS to widget', full.length + ' characters');
+  return true;
+}
+document.getElementById('css-apply').addEventListener('click', function () {
+  if (!cfg.theme) log('Note: the GOV.UK theme option is off, so only the queue rule is sent. Turn it on in Connection settings.');
+  applyCssLive(cssBox.value);
+});
+document.getElementById('css-save').addEventListener('click', function () {
+  var s = readStore(); s.css = cssBox.value; writeStore(s);
+  themeCss = cssBox.value;
+  applyCssLive(themeCss);
+  log('CSS saved in this browser');
+});
+document.getElementById('css-reset').addEventListener('click', function () {
+  cssBox.value = DEFAULT_CSS;
+  var s = readStore(); delete s.css; writeStore(s);
+  themeCss = DEFAULT_CSS;
+  applyCssLive(DEFAULT_CSS);
+  log('CSS reset to the GOV.UK theme');
+});
+document.getElementById('css-copy').addEventListener('click', function () {
+  var css = cssToSend(cssBox.value).replace(CSS_MARKER + '\n', '');
+  var snippet = "cxone('chat', 'setCustomCss', " + JSON.stringify(css) + ");";
+  copy(snippet, 'setCustomCss snippet copied');
+});
+
+/* =====================================================================
+   Inspector
+   ===================================================================== */
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+document.getElementById('btn-scan').addEventListener('click', function () {
+  var out = document.getElementById('scan-out');
+  if (!widgetDoc) { out.innerHTML = '<p class="govuk-body">The widget has not loaded yet.</p>'; return; }
+  var rows = {};
+  widgetDoc.querySelectorAll('#be-app *').forEach(function (el) {
+    var ds = el.getAttribute('data-selector') || '';
+    var cls = String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className || '');
+    var mods = (cls.match(/[A-Za-z]+_[A-Za-z0-9]+__[\w+-]+/g) || []).map(function (c) { return c.replace(/__[\w+-]+$/, ''); });
+    if (!ds && !mods.length) return;
+    var key = (ds ? '[data-selector="' + ds + '"]' : '') + '|' + mods.join(' ');
+    rows[key] = rows[key] || { ds: ds, mods: mods, tag: el.tagName.toLowerCase(), n: 0, text: (el.children.length ? '' : el.textContent.trim().slice(0, 40)) };
+    rows[key].n++;
+  });
+  var html = '<div class="inspector-wrap"><table class="govuk-table inspector-table"><caption class="govuk-table__caption govuk-table__caption--s">Elements in the widget</caption>' +
+    '<thead class="govuk-table__head"><tr class="govuk-table__row"><th class="govuk-table__header">data-selector</th><th class="govuk-table__header">Class prefix (use with [class*="…"])</th><th class="govuk-table__header">Tag</th><th class="govuk-table__header govuk-table__header--numeric">Count</th></tr></thead><tbody class="govuk-table__body">';
+  Object.keys(rows).forEach(function (k) {
+    var r = rows[k];
+    html += '<tr class="govuk-table__row"><td class="govuk-table__cell"><code>' + esc(r.ds || '–') + '</code></td><td class="govuk-table__cell"><code>' + esc(r.mods.join(' ') || '–') +
+      '</code>' + (r.text ? '<br><span class="govuk-hint govuk-!-margin-0">“' + esc(r.text) + '”</span>' : '') + '</td><td class="govuk-table__cell">' + r.tag + '</td><td class="govuk-table__cell govuk-table__cell--numeric">' + r.n + '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+
+  var vars = [];
+  try {
+    var cs = widgetDoc.defaultView.getComputedStyle(widgetDoc.documentElement);
+    [].forEach.call(widgetDoc.styleSheets, function (sh) {
+      var rules; try { rules = sh.cssRules; } catch (e) { return; }
+      [].forEach.call(rules, function (r) {
+        if (r.selectorText === ':root') [].forEach.call(r.style, function (p) { if (/colors|borderRadius/.test(p) && vars.indexOf(p) === -1) vars.push(p); });
+      });
+    });
+    if (vars.length) {
+      html += '<table class="govuk-table inspector-table"><caption class="govuk-table__caption govuk-table__caption--s">Theme variables (current values)</caption><tbody class="govuk-table__body">';
+      vars.forEach(function (p) {
+        var v = cs.getPropertyValue(p).trim();
+        html += '<tr class="govuk-table__row"><td class="govuk-table__cell"><code>' + esc(p) + '</code></td><td class="govuk-table__cell"><span class="swatch" style="background:' + esc(v) + '"></span><code>' + esc(v) + '</code></td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+  } catch (e) {}
+  out.innerHTML = html;
+  log('Scanned widget', Object.keys(rows).length + ' distinct elements');
+});
+
+/* ---------- Log buttons ---------- */
+function copy(text, okMsg) {
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+    .then(function () { log(okMsg); }, function () { log('Copy failed – select and copy manually'); });
+}
+document.getElementById('log-copy').addEventListener('click', function () { copy(logEl.textContent, 'Log copied'); });
+document.getElementById('log-clear').addEventListener('click', function () { logEl.textContent = ''; });
+
+log('Harness version ' + HARNESS_VERSION);
+</script>
+</body>
+</html>
