@@ -584,6 +584,41 @@ function waitForWidget() {
   }, 300);
 }
 
+/* ---------- Skip the name form for later chats too ----------
+   autoStartSession only runs when the page loads. After a chat ends, the widget shows the
+   name form again for the next conversation, so fill in the name and start it automatically. */
+var preChatHandled = typeof WeakSet === 'function' ? new WeakSet() : null;
+function skipPreChatForm(form) {
+  if (!preChatHandled || preChatHandled.has(form)) return;
+  var fields = [].filter.call(form.querySelectorAll('input, textarea, select'), function (f) { return f.type !== 'hidden'; });
+  var button = form.querySelector('[data-selector="PRIMARY_BUTTON"], button[type="submit"]');
+  if (!button) return;
+  preChatHandled.add(form);
+  if (fields.length > 1) { log('The new-chat form has more than a name field, so it was left for you to fill in'); return; }
+  if (fields.length === 1) {
+    var win = widgetDoc.defaultView;
+    var proto = fields[0].tagName === 'TEXTAREA' ? win.HTMLTextAreaElement.prototype : win.HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(fields[0], cfg.customerName || DEFAULTS.customerName);
+    fields[0].dispatchEvent(new win.Event('input', { bubbles: true }));
+    fields[0].dispatchEvent(new win.Event('change', { bubbles: true }));
+  }
+  // Let the widget register the name before starting the conversation
+  setTimeout(function () {
+    if (!form.isConnected) return;
+    if (window.__harnessNoAutoSubmit) { log('New-chat form filled (test mode – not submitted)'); return; }
+    button.click();
+    log('New-chat form skipped automatically', { name: cfg.customerName || DEFAULTS.customerName });
+  }, 300);
+}
+function watchPreChatForm() {
+  var check = function () {
+    var form = widgetDoc.querySelector('[data-selector="PRECONTACT_SURVEY"]');
+    if (form) skipPreChatForm(form);
+  };
+  new MutationObserver(check).observe(widgetDoc.body, { childList: true, subtree: true });
+  check();
+}
+
 function onWidgetReady() {
   var messenger = widgetDoc.querySelector('[data-selector="MESSENGER"]');
   var state = messenger && messenger.getAttribute('data-cy');
@@ -591,6 +626,7 @@ function onWidgetReady() {
   placeEmbed();
   document.getElementById('btn-open').disabled = false;
   log('Widget ready', { state: state || 'unknown' });
+  if (cfg.autoStart) watchPreChatForm();
 
   // Log open/close and new kinds of element (e.g. messages, composer) as they appear
   var seen = {};
