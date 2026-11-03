@@ -35,7 +35,20 @@
     .inspector-wrap { max-height: 420px; overflow: auto; margin-bottom: 20px; }
     .swatch { display: inline-block; width: 14px; height: 14px; border: 1px solid #0b0c0c; vertical-align: middle; margin-right: 6px; }
     /* Keep page content clear of the floating widget on small screens */
-    main { padding-bottom: 120px; }
+    .mode-floating main { padding-bottom: 120px; }
+
+    /* ---------- Embedded mode: pin the widget over the chat slot ---------- */
+    .chat-slot { height: 600px; max-height: 80vh; min-height: 420px; background: #fff; }
+    .chat-slot[hidden] { display: none; }
+    .mode-embedded #be-chat-container { position: absolute !important; z-index: 1 !important; }
+    .mode-embedded #be-chat-container #be-frame {
+      position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important;
+      max-width: none !important; max-height: none !important; margin: 0 !important;
+      transform: none !important; box-shadow: none !important; z-index: auto !important;
+    }
+    .mode-embedded #be-chat-container #be-frame iframe {
+      width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important;
+    }
   </style>
 </head>
 <body class="govuk-template__body">
@@ -82,7 +95,8 @@
             <p class="govuk-body" id="status-text" aria-live="polite">Loading the chat widget…</p>
             <p class="govuk-body"><strong class="govuk-tag govuk-tag--grey" id="status-tag">Loading</strong></p>
           </div>
-          <div class="panel__body">
+          <div class="chat-slot" id="chat-slot" hidden aria-label="Chat"></div>
+          <div class="panel__body" id="floating-body">
             <p class="govuk-body">The widget appears in the bottom-right corner of the page. You can also open it from here.</p>
             <div class="govuk-button-group">
               <button type="button" class="govuk-button govuk-button--start" id="btn-open" data-module="govuk-button" disabled>
@@ -123,13 +137,29 @@
                 </div>
                 <div class="govuk-form-group">
                   <label class="govuk-label" for="cfg-customHost">Custom loader host</label>
-                  <div class="govuk-hint">Only used when Environment is Custom. For example <code>web-modules-de-uk1.niceincontact.com</code></div>
+                  <div class="govuk-hint">Only used when Environment is Custom. Enter the cluster host, for example <code>uk3.nicecxone-sov2.uk</code> (the same value as the SDK harness), or the full loader host <code>web-modules-de-uk3.nicecxone-sov2.uk</code></div>
                   <input class="govuk-input" id="cfg-customHost" name="customHost" spellcheck="false" autocomplete="off">
                 </div>
                 <div class="govuk-form-group">
                   <label class="govuk-label" for="cfg-title">Page heading</label>
                   <input class="govuk-input" id="cfg-title" name="title">
                 </div>
+              </div>
+
+              <div class="govuk-form-group">
+                <fieldset class="govuk-fieldset">
+                  <legend class="govuk-fieldset__legend govuk-fieldset__legend--s">How the chat is shown</legend>
+                  <div class="govuk-radios govuk-radios--small" data-module="govuk-radios">
+                    <div class="govuk-radios__item">
+                      <input class="govuk-radios__input" id="cfg-display-embedded" name="display" type="radio" value="embedded">
+                      <label class="govuk-label govuk-radios__label" for="cfg-display-embedded">Embedded in the page, always open</label>
+                    </div>
+                    <div class="govuk-radios__item">
+                      <input class="govuk-radios__input" id="cfg-display-floating" name="display" type="radio" value="floating">
+                      <label class="govuk-label govuk-radios__label" for="cfg-display-floating">Floating chat icon in the corner (standard widget)</label>
+                    </div>
+                  </div>
+                </fieldset>
               </div>
 
               <div class="govuk-form-group">
@@ -302,14 +332,15 @@ var HARNESS_VERSION = '2026-11-03.1';
 var STORE_KEY = 'cxoneWidgetHarness';
 var CSS_MARKER = '/* harness-theme */';
 var DEFAULTS = {
-  brandId: '1027',
-  channelId: 'chat_2eb777e8-4c6f-4728-af23-26329f3ab463',
+  brandId: '3756',
+  channelId: 'chat_ba8be2e1-2600-45df-8574-01ec95486cd3',
   environment: 'NA1',
-  customHost: 'web-modules-de-uk3.nicecxone-sov2.uk',
+  customHost: '',
   title: 'Ask us online',
   alwaysOnline: true,
   hideQueue: true,
-  theme: true
+  theme: true,
+  display: 'embedded'
 };
 var QUEUE_CSS = '[class*="WaitingQueueModal_WaitingQueueModal"] { display: none !important; }';
 var DEFAULT_CSS = document.getElementById('default-css').textContent.trim();
@@ -336,15 +367,25 @@ if (qs.get('channelId')) cfg.channelId = qs.get('channelId');
 if (qs.get('env')) cfg.environment = qs.get('env').toUpperCase() === 'CUSTOM' ? 'custom' : qs.get('env').toUpperCase();
 if (qs.get('host')) { cfg.environment = 'custom'; cfg.customHost = qs.get('host'); }
 if (qs.get('theme') !== null) cfg.theme = qs.get('theme') !== '0';
+if (qs.get('display')) cfg.display = qs.get('display') === 'floating' ? 'floating' : 'embedded';
+var EMBEDDED = cfg.display !== 'floating';
+document.documentElement.classList.add(EMBEDDED ? 'mode-embedded' : 'mode-floating');
+var EMBED_CSS = '[data-selector="HEADER_MINIMIZE_WINDOW"] { display: none !important; }';
 var themeCss = typeof stored.css === 'string' && stored.css.trim() ? stored.css : DEFAULT_CSS;
 
 function loaderHost() {
-  if (cfg.environment === 'custom') return (cfg.customHost || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (cfg.environment === 'custom') {
+    var h = (cfg.customHost || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    // Accept the SDK-harness form (uk3.nicecxone-sov2.uk) as well as the full loader host
+    if (h && !/^web-modules-/.test(h)) h = 'web-modules-de-' + h.replace(/^channels-de-/, '');
+    return h;
+  }
   return 'web-modules-de-' + String(cfg.environment).toLowerCase() + '.niceincontact.com';
 }
 function cssToSend(css) {
   var parts = [CSS_MARKER];
   if (cfg.hideQueue) parts.push(QUEUE_CSS);
+  if (EMBEDDED) parts.push(EMBED_CSS);
   if (cfg.theme) parts.push(css);
   return parts.join('\n');
 }
@@ -354,6 +395,7 @@ var form = document.getElementById('settings-form');
 function fillForm(c) {
   ['brandId', 'channelId', 'environment', 'customHost', 'title'].forEach(function (k) { form.elements[k].value = c[k] || ''; });
   ['alwaysOnline', 'hideQueue', 'theme'].forEach(function (k) { form.elements[k].checked = !!c[k]; });
+  form.elements.display.value = c.display === 'floating' ? 'floating' : 'embedded';
 }
 fillForm(cfg);
 document.getElementById('page-title').textContent = cfg.title || DEFAULTS.title;
@@ -366,6 +408,7 @@ form.addEventListener('submit', function (e) {
   var next = {};
   ['brandId', 'channelId', 'environment', 'customHost', 'title'].forEach(function (k) { next[k] = form.elements[k].value.trim(); });
   ['alwaysOnline', 'hideQueue', 'theme'].forEach(function (k) { next[k] = form.elements[k].checked; });
+  next.display = form.elements.display.value || 'embedded';
   var s = readStore(); s.settings = next; writeStore(s);
   location.href = location.pathname; // drop URL overrides so saved settings take effect
 });
@@ -420,12 +463,53 @@ document.getElementById('summary').innerHTML =
 
   cxone('init', cfg.brandId);
   cxone('chat', 'init', Number(cfg.brandId) || cfg.brandId, cfg.channelId);
+  // Documented form is cxone('chat', 'enableChatAlwaysOnline') – an extra 'chat' argument is silently ignored
   if (cfg.alwaysOnline) cxone('chat', 'enableChatAlwaysOnline');
+  if (EMBEDDED) {
+    // Fill the frame and keep the window open; the page then pins the frame over #chat-slot
+    cxone('chat', 'setFullDisplay');
+    cxone('chat', 'openChatWindow');
+  }
   cxone('chat', 'setCustomCss', cssToSend(themeCss));
   log('Commands queued', { alwaysOnline: cfg.alwaysOnline, hideQueue: cfg.hideQueue, theme: cfg.theme });
 
   waitForWidget();
+  if (EMBEDDED) startEmbedding();
 })();
+
+/* =====================================================================
+   Embedded mode: keep the widget's container lined up with #chat-slot.
+   The loader only offers a floating window, so the page positions it.
+   ===================================================================== */
+function placeEmbed() {
+  var c = document.getElementById('be-chat-container');
+  var slot = document.getElementById('chat-slot');
+  if (!c || slot.hidden) return;
+  var r = slot.getBoundingClientRect();
+  c.style.top = (r.top + window.scrollY) + 'px';
+  c.style.left = (r.left + window.scrollX) + 'px';
+  c.style.width = r.width + 'px';
+  c.style.height = r.height + 'px';
+}
+function startEmbedding() {
+  var slot = document.getElementById('chat-slot');
+  slot.hidden = false;
+  document.getElementById('floating-body').hidden = true;
+  window.addEventListener('resize', placeEmbed);
+  document.addEventListener('toggle', placeEmbed, true);
+  // Anything above the slot can change height (banners, expanded settings), so re-check its position regularly
+  var last = '';
+  setInterval(function () {
+    var r = slot.getBoundingClientRect();
+    var key = Math.round(r.top + window.scrollY) + ',' + Math.round(r.left + window.scrollX) + ',' + Math.round(r.width) + ',' + Math.round(r.height);
+    if (key !== last) { last = key; placeEmbed(); }
+  }, 150);
+  var tries = 0;
+  var t = setInterval(function () {
+    if (document.getElementById('be-chat-container')) { placeEmbed(); log('Widget embedded in the page'); clearInterval(t); }
+    else if (++tries > 100) clearInterval(t);
+  }, 250);
+}
 
 /* =====================================================================
    Watch the widget
@@ -455,6 +539,7 @@ function onWidgetReady() {
   var messenger = widgetDoc.querySelector('[data-selector="MESSENGER"]');
   var state = messenger && messenger.getAttribute('data-cy');
   setStatus('Chat widget loaded' + (state ? ' (' + state + ')' : '') + '.', 'Ready', 'green');
+  placeEmbed();
   document.getElementById('btn-open').disabled = false;
   log('Widget ready', { state: state || 'unknown' });
 
