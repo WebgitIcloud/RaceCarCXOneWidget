@@ -77,8 +77,11 @@ The defaults are built in at the top of the main script (`DEFAULTS`).
 The CXone loader has no option to place the chat inside a page element – it always
 draws a floating window. In embedded mode the page does three things:
 
-1. Sends `cxone('chat', 'setFullDisplay')` and `cxone('chat', 'openChatWindow')`,
-   so the window opens straight away and fills its frame.
+1. Sends `cxone('chat', 'setWindowWidth', '100%')`, `cxone('chat', 'setWindowHeight', '100%')`
+   and `cxone('chat', 'openChatWindow')`, so the window opens straight away and fills its frame.
+   It does not use `setFullDisplay`: that turns the chat into a full-screen dialog, which makes
+   every link on the page unclickable, hides the page from screen readers and locks scrolling.
+   If the widget goes full-screen anyway (for example on a small screen), the page undoes this.
 2. Hides the window's minimise button with `setCustomCss`, so it stays open.
 3. Pins the widget's container (`#be-chat-container`) over the `#chat-slot` panel
    with page CSS and keeps it aligned as the page scrolls or its layout changes.
