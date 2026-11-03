@@ -53,6 +53,7 @@ URL, which takes priority over saved settings:
 | `theme` | `?theme=0` | Turn off the GOV.UK theme to see the widget's default look |
 | `autostart` | `?autostart=0` | Show the name form instead of starting the chat straight away |
 | `name` | `?name=Test%20user` | Customer name sent to CXone when the form is skipped |
+| `rich` | `?rich=0` | Turn off drawing buttons, cards and markdown inside the widget |
 | `display` | `?display=floating` | `embedded` (default) puts the chat in the page; `floating` shows the standard corner icon |
 
 The loader URL is built as `https://web-modules-de-<env>.niceincontact.com/loader/1/loader.js`.
@@ -79,6 +80,36 @@ Options in Connection settings:
 - **Apply the GOV.UK theme to the widget** – sends the theme CSS.
 
 The defaults are built in at the top of the main script (`DEFAULTS`).
+
+## Buttons, cards and markdown
+
+The Cognigy output transformer (`cognigy-cxone-transformer-complete.ts`) sends rich
+content as text – a `CXRICH:<base64 JSON>:CXRICH` marker or plain JSON – because the
+NiCE CXone endpoint only passes text. The native widget can't decode that, so on its
+own it shows the marker instead of buttons, and shows markdown as plain text.
+
+With **Draw buttons, cards and markdown from Cognigy inside the widget** on (the
+default), the page does what the custom SDK harness does, inside the widget:
+
+- Finds each bot message (`[data-selector="AGENT_MESSAGE_BUBBLE"]`) and decodes it
+  with the same rules as the SDK harness: `CXRICH` markers, JSON in the text (including
+  JSON CXone has altered), Cognigy `_quickReplies`, `_buttons`, `_list`, `_gallery`,
+  `_image`, `_video`, `_audio`, `_adaptiveCard`, and CXone `QUICK_REPLIES`,
+  `LIST_PICKER`, `RICH_LINK` and `ADAPTIVE_CARD` content.
+- Draws buttons, lists, galleries and Adaptive Cards in the GOV.UK style, and renders
+  markdown (bold, italic, links, lists). Plain-text messages are left as the widget drew them.
+- When a button is clicked, types the button's **value** into the widget's message box
+  (`[data-selector="TEXTAREA"]`) and sends it – the same as the SDK harness's "Button
+  value as the text" setting. Adaptive Card submits send
+  `{"_cardSubmit":true,"_label":"…", …values}` as text, which the Cognigy input
+  transformer turns into `input.data`.
+- Shows the button title in the customer's own message instead of the value or card JSON.
+
+Keep the Cognigy **output transformer** and **input transformer** both on.
+
+This works by reading and changing the widget's internal page, so it's for testing only
+and a CXone update could break it. The event log shows each message it renders and each
+value it sends. If a click doesn't send, the log says so – press Enter in the chat.
 
 ## Embedded mode
 
