@@ -51,6 +51,8 @@ URL, which takes priority over saved settings:
 | `env` | `?env=UK1` | Cluster: UK1, UK2, EU1, EU2, NA1, NA2, AU1, AU2, CA1, JP1, AE1, JO1, KR1, ZA1 |
 | `host` | `?host=uk3.nicecxone-sov2.uk` | Custom cluster host, which overrides `env`. The `web-modules-de-` prefix is added if missing, so the SDK harness value works here too |
 | `theme` | `?theme=0` | Turn off the GOV.UK theme to see the widget's default look |
+| `autostart` | `?autostart=0` | Show the name form instead of starting the chat straight away |
+| `name` | `?name=Test%20user` | Customer name sent to CXone when the form is skipped |
 | `display` | `?display=floating` | `embedded` (default) puts the chat in the page; `floating` shows the standard corner icon |
 
 The loader URL is built as `https://web-modules-de-<env>.niceincontact.com/loader/1/loader.js`.
@@ -66,6 +68,12 @@ Options in Connection settings:
   "We're offline", because CXone reports the channel as offline when no agents
   are available. Use exactly this form: `cxone('chat', 'chat', 'enableChatAlwaysOnline')`
   is silently ignored.
+- **Skip the name form and start the chat when the page loads** (on by default) – sends
+  `setCustomerName` with the name in **Name sent to CXone**, then `openChatWindow`, then
+  `autoStartSession` as the last call, as CXone requires. CXone sends a hidden automated
+  first message to start the session; agents can see it, the customer can't. If your Cognigy
+  Flow reacts to the first input it receives, make sure that message doesn't send it down
+  the wrong path. If a session is already running, the existing chat is reopened instead.
 - **Hide the waiting queue pop-up** – adds
   `[class*="WaitingQueueModal_WaitingQueueModal"] { display: none !important; }`.
 - **Apply the GOV.UK theme to the widget** – sends the theme CSS.
