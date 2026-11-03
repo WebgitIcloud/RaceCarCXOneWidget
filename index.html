@@ -176,7 +176,17 @@
                     <input class="govuk-checkboxes__input" id="cfg-theme" name="theme" type="checkbox">
                     <label class="govuk-label govuk-checkboxes__label" for="cfg-theme">Apply the GOV.UK theme to the widget</label>
                   </div>
+                  <div class="govuk-checkboxes__item">
+                    <input class="govuk-checkboxes__input" id="cfg-autoStart" name="autoStart" type="checkbox">
+                    <label class="govuk-label govuk-checkboxes__label" for="cfg-autoStart">Skip the name form and start the chat when the page loads (<code>autoStartSession</code>)</label>
+                  </div>
                 </div>
+              </div>
+
+              <div class="govuk-form-group">
+                <label class="govuk-label" for="cfg-customerName">Name sent to CXone when the form is skipped</label>
+                <div class="govuk-hint">CXone needs a customer name, so this one is used instead of asking</div>
+                <input class="govuk-input govuk-!-width-one-half" id="cfg-customerName" name="customerName" autocomplete="off">
               </div>
 
               <div class="govuk-button-group">
@@ -340,7 +350,9 @@ var DEFAULTS = {
   alwaysOnline: true,
   hideQueue: true,
   theme: true,
-  display: 'embedded'
+  display: 'embedded',
+  autoStart: true,
+  customerName: 'Web visitor'
 };
 var QUEUE_CSS = '[class*="WaitingQueueModal_WaitingQueueModal"] { display: none !important; }';
 var DEFAULT_CSS = document.getElementById('default-css').textContent.trim();
@@ -367,6 +379,8 @@ if (qs.get('channelId')) cfg.channelId = qs.get('channelId');
 if (qs.get('env')) cfg.environment = qs.get('env').toUpperCase() === 'CUSTOM' ? 'custom' : qs.get('env').toUpperCase();
 if (qs.get('host')) { cfg.environment = 'custom'; cfg.customHost = qs.get('host'); }
 if (qs.get('theme') !== null) cfg.theme = qs.get('theme') !== '0';
+if (qs.get('autostart') !== null) cfg.autoStart = qs.get('autostart') !== '0';
+if (qs.get('name')) cfg.customerName = qs.get('name');
 if (qs.get('display')) cfg.display = qs.get('display') === 'floating' ? 'floating' : 'embedded';
 var EMBEDDED = cfg.display !== 'floating';
 document.documentElement.classList.add(EMBEDDED ? 'mode-embedded' : 'mode-floating');
@@ -393,8 +407,8 @@ function cssToSend(css) {
 /* ---------- Populate the form ---------- */
 var form = document.getElementById('settings-form');
 function fillForm(c) {
-  ['brandId', 'channelId', 'environment', 'customHost', 'title'].forEach(function (k) { form.elements[k].value = c[k] || ''; });
-  ['alwaysOnline', 'hideQueue', 'theme'].forEach(function (k) { form.elements[k].checked = !!c[k]; });
+  ['brandId', 'channelId', 'environment', 'customHost', 'title', 'customerName'].forEach(function (k) { form.elements[k].value = c[k] || ''; });
+  ['alwaysOnline', 'hideQueue', 'theme', 'autoStart'].forEach(function (k) { form.elements[k].checked = !!c[k]; });
   form.elements.display.value = c.display === 'floating' ? 'floating' : 'embedded';
 }
 fillForm(cfg);
@@ -406,8 +420,8 @@ cssBox.value = themeCss;
 form.addEventListener('submit', function (e) {
   e.preventDefault();
   var next = {};
-  ['brandId', 'channelId', 'environment', 'customHost', 'title'].forEach(function (k) { next[k] = form.elements[k].value.trim(); });
-  ['alwaysOnline', 'hideQueue', 'theme'].forEach(function (k) { next[k] = form.elements[k].checked; });
+  ['brandId', 'channelId', 'environment', 'customHost', 'title', 'customerName'].forEach(function (k) { next[k] = form.elements[k].value.trim(); });
+  ['alwaysOnline', 'hideQueue', 'theme', 'autoStart'].forEach(function (k) { next[k] = form.elements[k].checked; });
   next.display = form.elements.display.value || 'embedded';
   var s = readStore(); s.settings = next; writeStore(s);
   location.href = location.pathname; // drop URL overrides so saved settings take effect
@@ -471,10 +485,18 @@ document.getElementById('summary').innerHTML =
     // of the page inert (no links, hidden from screen readers) and locks scrolling.
     cxone('chat', 'setWindowWidth', '100%');
     cxone('chat', 'setWindowHeight', '100%');
-    cxone('chat', 'openChatWindow');
   }
   cxone('chat', 'setCustomCss', cssToSend(themeCss));
-  log('Commands queued', { alwaysOnline: cfg.alwaysOnline, hideQueue: cfg.hideQueue, theme: cfg.theme });
+  if (cfg.autoStart) {
+    // Documented order: name first (it's required), open the window, and autoStartSession must be the LAST call.
+    // This skips the pre-chat form and starts a session straight away (if one isn't already running).
+    cxone('chat', 'setCustomerName', cfg.customerName || DEFAULTS.customerName);
+    cxone('chat', 'openChatWindow');
+    cxone('chat', 'autoStartSession');
+  } else if (EMBEDDED) {
+    cxone('chat', 'openChatWindow');
+  }
+  log('Commands queued', { alwaysOnline: cfg.alwaysOnline, hideQueue: cfg.hideQueue, theme: cfg.theme, autoStart: cfg.autoStart, display: cfg.display });
 
   waitForWidget();
   if (EMBEDDED) startEmbedding();
